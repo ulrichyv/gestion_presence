@@ -1,8 +1,10 @@
 import os
+import uuid
 import qrcode
 from django.template.loader import render_to_string
 from django.conf import settings
 from html2image import Html2Image
+from PIL import Image
 
 class BadgeService:
     def __init__(self, nom, prenom, fonction, matricule, cni, photo_path):
@@ -21,7 +23,7 @@ class BadgeService:
 
     def save_photo(self):
         """Enregistre la photo téléchargée"""
-        photo_filename = f"{self.nom}_{self.prenom}.jpg".replace(" ", "_")
+        photo_filename = f"{uuid.uuid4()}.jpg"
         self.photo_full_path = os.path.join(self.badge_output_path, photo_filename)
 
         with open(self.photo_full_path, "wb+") as destination:
@@ -32,7 +34,7 @@ class BadgeService:
 
     def generate_qr_code(self):
         """Génère un QR Code pour l'identification"""
-        qr_filename = f"qr_{self.nom}_{self.prenom}.png".replace(" ", "_")
+        qr_filename = f"qr_{uuid.uuid4()}.png"
         qr_full_path = os.path.join(self.qr_output_path, qr_filename)
 
         # Contenu du QR Code (URL ou info d'identification)
@@ -63,7 +65,7 @@ class BadgeService:
 
     def generate_badge_image(self):
         """Génère l'image du badge avec html2image"""
-        image_filename = f"badge_{self.nom}_{self.prenom}.png".replace(" ", "_")
+        image_filename = f"badge_{uuid.uuid4()}.png"
         self.image_full_path = os.path.join(self.badge_output_path, image_filename)
 
         try:

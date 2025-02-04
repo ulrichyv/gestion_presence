@@ -22,7 +22,7 @@
                         {% endif %}
                         
                         <!-- Formulaire d'inscription -->
-                        <form action="/generer_badge" method="post" class="needs-validation" novalidate>
+                        <form action="/generer_badge" enctype="multipart/form-data" method="post" >
                             {% csrf_token %}
                             
                             <!-- Champs du formulaire -->
@@ -40,7 +40,7 @@
                             </div>
                             <div class="mb-3">
                                 <label for="identifiant" class="form-label">Matricule</label>
-                                <input type="text" class="form-control" id="identifiant" name="identifiant" required>
+                                <input type="text" class="form-control" id="matricule" name="matricule" required>
                             </div>
                             <div class="mb-3">
                                 <label for="cni" class="form-label">Numéro de CNI</label>
