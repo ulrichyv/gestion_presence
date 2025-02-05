@@ -5,9 +5,10 @@ class User(AbstractUser):
     cni = models.CharField(max_length=20, unique=True)
     matricule = models.CharField(max_length=255, unique=True)
     fonction = models.CharField(max_length=255)
-    path_qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True)
-    path_badge = models.ImageField(upload_to='badges/', blank=True, null=True)
-    path_photo = models.ImageField(upload_to='photos/', blank=True, null=True)
+    path_qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True, max_length=255)
+    path_badge = models.ImageField(upload_to='badges/', blank=True, null=True, max_length=255)
+    path_photo = models.ImageField(upload_to='photos/', blank=True, null=True, max_length=255)
+
 
 
 class Presence(models.Model):

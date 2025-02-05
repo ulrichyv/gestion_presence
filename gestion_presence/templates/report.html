@@ -23,6 +23,7 @@
                             <th>Matricule</th>
                             <th>CNI</th>
                             <th>Présences</th>
+                            <th>Télécharger Badge</th>
                         </tr>
                     </thead>
                     <tfoot>
@@ -32,6 +33,7 @@
                             <th>Matricule</th>
                             <th>CNI</th>
                             <th>Présences</th>
+                            <th>Télécharger Badge</th>
                         </tr>
                     </tfoot>
                     <tbody>
@@ -47,6 +49,16 @@
                                     <li>{{ presence.date }} - {{ presence.get_status_display }} ({{ presence.heure_arrivee }} - {{ presence.heure_depart }})</li>
                                     {% endfor %}
                                 </ul>
+                            </td>
+                            <td>
+                                {% if data.user.path_badge %}
+                                    <a href="{{ data.user.path_badge }}" download>
+                                        <button class="btn btn-primary">Télécharger</button>
+                                    </a>
+                                    <span>{{ data.user.path_badge.url }}</span>
+                                {% else %}
+                                    <span>Aucun badge disponible</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}

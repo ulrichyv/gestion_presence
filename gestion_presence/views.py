@@ -7,6 +7,7 @@ from django.conf import settings
 from django.http import HttpResponse
 from .models import User, Presence
 import qrcode
+import random
 import os
 import time
 from selenium import webdriver
@@ -16,7 +17,22 @@ from webdriver_manager.chrome import ChromeDriverManager
 from PIL import Image
 
 def index(request):
-    return render(request, 'index.html')
+    users = User.objects.all()  # Récupère tous les utilisateurs
+    total_user = users.count()  # Nombre total d'utilisateurs
+    total_presence = 0  # Initialisation du compteur de présences
+
+    # Calcul du total des présences pour tous les utilisateurs
+    for user in users:
+        total_presence += user.presences.filter(status='P').count()  # Filtrer uniquement les présences
+
+    # Calcul du pourcentage de présence
+    if total_user > 0:  # Éviter la division par zéro
+        presence_percentage = (total_presence / (total_user * len(users))) * 100
+    else:
+        presence_percentage = 0
+
+    return render(request, 'index.html', {'total_user': total_user, 'presence': total_presence, 'presence_percentage': presence_percentage})
+
 
 def report(request):
     users = User.objects.all()  # Récupère tous les utilisateurs
@@ -108,25 +124,28 @@ def generer_badge(request):
 
         # Génération du badge final
         badge_image = generate_badge_from_html(badge_html, nom, prenom)
+        
 
         # Création de l'utilisateur
         try:
+            username = f"{nom.lower()}_{prenom.lower()}_{random.randint(1000, 9999)}"
             user = User.objects.create(
+                username=username,  # Ajout du username unique
                 first_name=nom,
                 last_name=prenom,
                 cni=cni,
                 matricule=matricule,
                 fonction=fonction,
                 path_qr_code=request.build_absolute_uri(qr_url),
-                path_badge=request.build_absolute_uri(badge_image),  # Corrected here
+                path_badge=f"/media/badge_final_{nom}_{prenom}.png",
                 path_photo=request.build_absolute_uri(photo_url),
             )
-            user.save()
+            print(user.path_badge)
         except Exception as e:
             messages.error(request, f"Une erreur est survenue : {e}")
             return redirect("formulaire")
 
         messages.success(request, "Badge généré avec succès!")
-        return redirect("")
+        return redirect("/")
 
     return render(request, "create_badge_form.html")
