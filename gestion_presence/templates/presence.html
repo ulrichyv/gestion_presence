@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner QR Code</title>
+</head>
+<body>
+    <h1>Scanner le QR Code</h1>
+
+    <button id="scanBtn">Scanner le QR Code</button>
+    <p id="message"></p>
+
+    <script>
+        document.getElementById('scanBtn').addEventListener('click', function () {
+            // Lancer le scan du QR code
+            startScanning();
+        });
+
+        function startScanning() {
+            let video = document.createElement('video');
+            let canvas = document.createElement('canvas');
+            let ctx = canvas.getContext('2d');
+
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(function (stream) {
+                    video.srcObject = stream;
+                    video.setAttribute('playsinline', true); // nécessaire pour l'iPhone
+                    video.play();
+
+                    requestAnimationFrame(scanFrame);
+                });
+
+            function scanFrame() {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    // Decoder le QR Code avec jsQR
+                    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    let qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+
+                    if (qrCode) {
+                        // Envoie des données au serveur (Django)
+                        fetch('/scan_qr_code/', {
+                            method: 'POST',
+                            body: new URLSearchParams({
+                                'qr_data': qrCode.data
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            document.getElementById('message').innerText = data.message;
+                        })
+                        .catch(error => {
+                            console.error('Erreur:', error);
+                        });
+                    }
+                }
+
+                requestAnimationFrame(scanFrame);
+            }
+        }
+    </script>
+
+    <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script> <!-- Utilisation de la librairie jsQR pour décodeur QR code -->
+</body>
+</html>

@@ -8,8 +8,7 @@ class User(AbstractUser):
     path_qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True, max_length=255)
     path_badge = models.ImageField(upload_to='badges/', blank=True, null=True, max_length=255)
     path_photo = models.ImageField(upload_to='photos/', blank=True, null=True, max_length=255)
-
-
+    qr_data = models.TextField()
 
 class Presence(models.Model):
     STATUS_CHOICES = [

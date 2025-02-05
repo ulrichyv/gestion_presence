@@ -15,6 +15,89 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from PIL import Image
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from datetime import datetime
+
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from datetime import datetime
+from .models import User, Presence
+
+@api_view(['POST'])
+def scan(request):
+    qr_data = request.data.get('qr_data')
+    
+    if not qr_data:
+        return Response({'message': 'QR data is missing'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Supposons que le QR code contient "Nom: John, Matricule: 1234"
+        data = qr_data.split(",")  
+        if len(data) < 2:
+            return Response({'message': 'Format du QR Code invalide'}, status=status.HTTP_400_BAD_REQUEST)
+
+        nom = data[0].split(":")[1].strip()
+        matricule = data[1].split(":")[1].strip()
+
+        # Vérifier si l'utilisateur existe
+        user = User.objects.get(matricule=matricule)
+
+        # Vérifier s'il y a déjà une présence aujourd'hui
+        today = datetime.now().date()
+        presence, created = Presence.objects.get_or_create(
+            user=user,
+            date=today,
+            defaults={'status': 'P', 'heure_arrivee': datetime.now().time()}
+        )
+
+        if not created:
+            return Response({'message': f"{nom} a déjà été marqué présent aujourd'hui."}, status=status.HTTP_200_OK)
+        
+        return Response({'message': f'{nom} est maintenant marqué comme présent'}, status=status.HTTP_201_CREATED)
+
+    except User.DoesNotExist:
+        return Response({'message': 'Utilisateur non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['POST'])
+def scan_qr_code(request):
+    try:
+        qr_data = request.data.get('qr_data')
+        print(f"Données reçues : {request.data}")  # Log des données reçues pour le débogage
+        if not qr_data:
+            return Response({'message': 'Données QR manquantes'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Supposons que le QR code contient "Nom: John, Matricule: 1234"
+        data = qr_data.split(",")  
+        if len(data) < 2:
+            return Response({'message': 'Format du QR Code invalide'}, status=status.HTTP_400_BAD_REQUEST)
+
+        nom = data[0].split(":")[1].strip()
+        matricule = data[1].split(":")[1].strip()
+
+        # Vérifier si l'utilisateur existe
+        user = User.objects.get(matricule=matricule)
+
+        # Vérifier s'il y a déjà une présence aujourd'hui
+        today = datetime.now().date()
+        presence, created = Presence.objects.get_or_create(
+            user=user,
+            date=today,
+            defaults={'status': 'P', 'heure_arrivee': datetime.now().time()}
+        )
+
+        if not created:
+            return Response({'message': f"{nom} a déjà été marqué présent aujourd'hui."}, status=status.HTTP_200_OK)
+        
+        return Response({'message': f'{nom} est maintenant marqué comme présent'}, status=status.HTTP_201_CREATED)
+
+    except User.DoesNotExist:
+        return Response({'message': 'Utilisateur non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 def index(request):
     users = User.objects.all()  # Récupère tous les utilisateurs
@@ -31,7 +114,12 @@ def index(request):
     else:
         presence_percentage = 0
 
-    return render(request, 'index.html', {'total_user': total_user, 'presence': total_presence, 'presence_percentage': presence_percentage})
+    # Retourner les données à la vue
+    return render(request, 'index.html', {
+        'total_user': total_user,
+        'total_presence': total_presence,
+        'presence_percentage': presence_percentage,
+    })
 
 
 def report(request):
@@ -116,15 +204,14 @@ def generer_badge(request):
                 "fonction": fonction,
                 "matricule": matricule,
                 "cni": cni,
-                "photo_path": request.build_absolute_uri(photo_url),  # URL complète
-                "qr_code_path": request.build_absolute_uri(qr_url),   # URL complète
+                "photo_path": request.build_absolute_uri(photo_url),
+                "qr_code_path": request.build_absolute_uri(qr_url),
                 "local_path": request.build_absolute_uri("/media/logos/logo.png"),
             },
         )
 
         # Génération du badge final
         badge_image = generate_badge_from_html(badge_html, nom, prenom)
-        
 
         # Création de l'utilisateur
         try:
@@ -139,8 +226,9 @@ def generer_badge(request):
                 path_qr_code=request.build_absolute_uri(qr_url),
                 path_badge=f"/media/badge_final_{nom}_{prenom}.png",
                 path_photo=request.build_absolute_uri(photo_url),
+                qr_data=qr_data,  # Stockage des données du QR code
             )
-            print(user.path_badge)
+            print(user.qr_data)  # Vérification que les données du QR sont bien stockées
         except Exception as e:
             messages.error(request, f"Une erreur est survenue : {e}")
             return redirect("formulaire")
@@ -149,3 +237,7 @@ def generer_badge(request):
         return redirect("/")
 
     return render(request, "create_badge_form.html")
+
+
+def presence(request):
+    return render(request, 'presence.html')
