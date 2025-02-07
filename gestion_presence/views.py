@@ -19,13 +19,18 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime
-
+from django.db.models.functions import TruncDay
+from django.db.models import Count, Case, When, IntegerField
 
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime
 from .models import User, Presence
+from django.shortcuts import render
+from datetime import datetime
+from django.db.models import Count, Case, When, IntegerField
+from django.db.models.functions import TruncDay
 
 @api_view(['POST'])
 def scan(request):
@@ -241,3 +246,49 @@ def generer_badge(request):
 
 def presence(request):
     return render(request, 'presence.html')
+
+
+
+
+def rapport(request):
+    """ Génère un rapport pour un employé ou pour le mois en cours. """
+    
+    # Récupération des données du formulaire, s'il y en a
+    nom = request.POST.get("nom", "")  # Par défaut, vide si non renseigné
+    date_debut = request.POST.get("Date_deb", None)
+    date_fin = request.POST.get("Date_fin", None)
+    
+    # Si pas de données du formulaire, on prend les valeurs par défaut pour le mois en cours
+    if not date_debut or not date_fin:
+        today = datetime.now()
+        date_debut = today.replace(day=1)  # Premier jour du mois
+        date_fin = today  # Aujourd'hui
+    
+    else:
+        # Convertir les dates en objets datetime si elles ont été soumises
+        date_debut = datetime.strptime(date_debut, '%Y-%m-%d')
+        date_fin = datetime.strptime(date_fin, '%Y-%m-%d')
+
+    # Filtrer les présences par nom (si renseigné) et par date
+    presences = Presence.objects.filter(
+        user__nom__icontains=nom,
+        date__range=[date_debut, date_fin]
+    ).annotate(
+        day=TruncDay('date'),
+        countP=Count(Case(When(status='P', then=1), output_field=IntegerField())),
+        countA=Count(Case(When(status='A', then=1), output_field=IntegerField()))
+    ).values('day', 'countP', 'countA').order_by('day')
+
+    # Calcul des totaux
+    total_presences = sum([p['countP'] for p in presences])
+    total_absences = sum([p['countA'] for p in presences])
+
+    context = {
+        'nom': nom,
+        'date_debut': date_debut.strftime('%Y-%m-%d'),
+        'date_fin': date_fin.strftime('%Y-%m-%d'),
+        'countP': total_presences,
+        'countA': total_absences,
+    }
+
+    return render(request, 'rapport/rapport.html', context)

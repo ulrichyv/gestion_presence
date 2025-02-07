@@ -1,0 +1,94 @@
+{% extends 'home.html' %}
+{% block content %}
+<!-- Content Wrapper -->
+<div id="content-wrapper" class="d-flex flex-column p-4 h-60">
+
+    <!-- Main Content -->
+    <div id="content">
+        <br/>
+        <!-- Topbar -->
+        <nav class="navbar navbar-expand navbar-light bg-white topbar static-top shadow">
+            <div class="container-fluid">
+                <form class="d-flex align-items-center gap-3 w-100" action="/rapport" method="post">
+                    {% csrf_token %}
+                    <!-- Champ Nom employé -->
+                    <div class="mb-3 col-md-3 d-flex align-items-center gap-2">
+                        <label for="nom" class="form-label mb-0">Nom employé</label>
+                        <input type="text" class="form-control" id="nom" name="nom" value="{{ nom }}" required>
+                    </div>
+                    
+                    <!-- Champ Date de début -->
+                    <div class="mb-3 col-md-3 d-flex align-items-center gap-2">
+                        <label for="Date_deb" class="form-label mb-0">Date début</label>
+                        <input type="date" class="form-control" id="Date_deb" name="Date_deb" value="{{ date_debut }}" required>
+                    </div>
+                    
+                    <!-- Champ Date de fin -->
+                    <div class="mb-3 col-md-3 d-flex align-items-center gap-2">
+                        <label for="Date_fin" class="form-label mb-0">Date fin</label>
+                        <input type="date" class="form-control" id="Date_fin" name="Date_fin" value="{{ date_fin }}" required>
+                    </div>
+                    
+                    <!-- Bouton de recherche -->
+                    <div class="mb-3 col-md-3 d-flex align-items-center">
+                        <button type="submit" class="btn btn-primary w-100">Search</button>
+                    </div>
+                </form>
+            </div>
+        </nav>
+
+        <!-- Tableau des présences -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Liste des Présences pour {{ nom if nom else "tous les employés" }}</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Date début</th>
+                                <th>Date fin</th>
+                                <th>Nombre d'heures présentes</th>
+                                <th>Nombre d'heures d'absence</th>
+                            </tr>
+                        </thead>
+                        <tfoot>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Date début</th>
+                                <th>Date fin</th>
+                                <th>Nombre d'heures présentes</th>
+                                <th>Nombre d'heures d'absence</th>
+                            </tr>
+                        </tfoot>
+                        <tbody>
+                            {% if presences %}
+                                {% for presence in presences %}
+                                    <tr>
+                                        <td>{{ presence.user.nom }}</td>
+                                        <td>{{ presence.day }}</td>
+                                        <td>{{ date_fin }}</td>
+                                        <td>{{ presence.countP }}h</td>
+                                        <td>{{ presence.countA }}h</td>
+                                    </tr>
+                                {% endfor %}
+                                <tr>
+                                    <td colspan="3" class="font-weight-bold">Total</td>
+                                    <td>{{ countP }}h</td>
+                                    <td>{{ countA }}h</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center">Aucune présence trouvée pour cette période.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
