@@ -271,7 +271,7 @@ def rapport(request):
 
     # Filtrer les présences par nom (si renseigné) et par date
     presences = Presence.objects.filter(
-        user__nom__icontains=nom,
+        user__first_name__icontains=nom,
         date__range=[date_debut, date_fin]
     ).annotate(
         day=TruncDay('date'),

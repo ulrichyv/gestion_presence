@@ -40,7 +40,8 @@
         <!-- Tableau des présences -->
         <div class="card shadow mb-4">
             <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Liste des Présences pour {{ nom if nom else "tous les employés" }}</h6>
+                <h6 class="m-0 font-weight-bold text-primary">Liste des Présences pour {% if nom %} {{ nom }} {% else %} tous les employés {% endif %}
+
             </div>
             <div class="card-body">
                 <div class="table-responsive">
