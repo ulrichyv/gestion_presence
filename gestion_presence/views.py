@@ -292,3 +292,5 @@ def rapport(request):
     }
 
     return render(request, 'rapport/rapport.html', context)
+def login(request):
+    return render(request, 'auth.html')

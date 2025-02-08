@@ -40,17 +40,16 @@
         <!-- Tableau des présences -->
         <div class="card shadow mb-4">
             <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Liste des Présences pour {% if nom %} {{ nom }} {% else %} tous les employés {% endif %}
-
+                <h6 class="m-0 font-weight-bold text-primary">Liste des Présences pour {% if nom %} {{ nom }} {% else %} tous les employés {% endif %}</h6>
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                         <thead>
                             <tr>
                                 <th>Nom</th>
-                                <th>Date début</th>
-                                <th>Date fin</th>
+                                <th>Date</th>
                                 <th>Nombre d'heures présentes</th>
                                 <th>Nombre d'heures d'absence</th>
                             </tr>
@@ -58,8 +57,7 @@
                         <tfoot>
                             <tr>
                                 <th>Nom</th>
-                                <th>Date début</th>
-                                <th>Date fin</th>
+                                <th>Date</th>
                                 <th>Nombre d'heures présentes</th>
                                 <th>Nombre d'heures d'absence</th>
                             </tr>
@@ -68,21 +66,20 @@
                             {% if presences %}
                                 {% for presence in presences %}
                                     <tr>
-                                        <td>{{ presence.user.nom }}</td>
-                                        <td>{{ presence.day }}</td>
-                                        <td>{{ date_fin }}</td>
+                                        <td>{{ presence.user.first_name }}</td>
+                                        <td>{{ presence.date }}</td>
                                         <td>{{ presence.countP }}h</td>
                                         <td>{{ presence.countA }}h</td>
                                     </tr>
                                 {% endfor %}
                                 <tr>
-                                    <td colspan="3" class="font-weight-bold">Total</td>
+                                    <td colspan="2" class="font-weight-bold">Total</td>
                                     <td>{{ countP }}h</td>
                                     <td>{{ countA }}h</td>
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="5" class="text-center">Aucune présence trouvée pour cette période.</td>
+                                    <td colspan="4" class="text-center">Aucune présence trouvée pour cette période.</td>
                                 </tr>
                             {% endif %}
                         </tbody>

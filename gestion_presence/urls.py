@@ -27,6 +27,6 @@ urlpatterns = [
     path('generer_badge', views.generer_badge, name='generer_badge'),
     path('presence', views.presence, name='presence'),
     path('rapport', views.rapport, name='rapport'),
-    
+    path('login', views.login, name='login'),
     path('api/scan_qr_code/', views.scan_qr_code, name='scan-qr-code'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
