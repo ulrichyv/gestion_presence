@@ -21,7 +21,7 @@ from rest_framework import status
 from datetime import datetime
 from django.db.models.functions import TruncDay
 from django.db.models import Count, Case, When, IntegerField
-
+from django.db.models import F, ExpressionWrapper, fields
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -250,34 +250,51 @@ def presence(request):
 
 
 
-def rapport(request):
+from django.shortcuts import render
+from django.db.models import F, Case, When, Value, IntegerField, Count, ExpressionWrapper, fields
+from django.db.models.functions import TruncDay
+from datetime import datetime
+from .models import Presence
+
+def rapport(request): 
     """ Génère un rapport pour un employé ou pour le mois en cours. """
     
-    # Récupération des données du formulaire, s'il y en a
-    nom = request.POST.get("nom", "")  # Par défaut, vide si non renseigné
+    # Récupération des données du formulaire
+    nom = request.POST.get("nom", "")  # Nom de l'employé (facultatif)
     date_debut = request.POST.get("Date_deb", None)
     date_fin = request.POST.get("Date_fin", None)
     
-    # Si pas de données du formulaire, on prend les valeurs par défaut pour le mois en cours
+    # Si aucune date n'est fournie, on prend les valeurs par défaut du mois en cours
     if not date_debut or not date_fin:
         today = datetime.now()
         date_debut = today.replace(day=1)  # Premier jour du mois
         date_fin = today  # Aujourd'hui
-    
     else:
-        # Convertir les dates en objets datetime si elles ont été soumises
+        # Conversion des dates en objets datetime
         date_debut = datetime.strptime(date_debut, '%Y-%m-%d')
         date_fin = datetime.strptime(date_fin, '%Y-%m-%d')
 
-    # Filtrer les présences par nom (si renseigné) et par date
+    # Filtrage des présences en fonction du nom et de la plage de dates
     presences = Presence.objects.filter(
         user__first_name__icontains=nom,
         date__range=[date_debut, date_fin]
     ).annotate(
-        day=TruncDay('date'),
-        countP=Count(Case(When(status='P', then=1), output_field=IntegerField())),
-        countA=Count(Case(When(status='A', then=1), output_field=IntegerField()))
-    ).values('day', 'countP', 'countA').order_by('day')
+        day=TruncDay('date'),  # Regroupement par jour
+        countP=Count(Case(When(status='P', then=1), output_field=IntegerField())),  # Comptage des présences
+        countA=Count(Case(When(status='A', then=1), output_field=IntegerField())),  # Comptage des absences
+        heure_arrivee=F('heure_arrivee'),
+        heure_depart=F('heure_depart'),
+        heures_travaillees=ExpressionWrapper(
+            Case(
+                # Cas Présent : Calcul de la durée travaillée
+                When(status='P', then=F('heure_depart') - F('heure_arrivee')),
+                # Cas Absent : Temps non travaillé (9h moins le temps présent)
+                When(status='A', then=Value(9 * 3600) - (F('heure_depart') - F('heure_arrivee'))),
+                default=Value(0),  # Valeur par défaut si aucun statut
+                output_field=fields.DurationField(),
+            )
+        )
+    ).values('day', 'countP', 'countA', 'heure_arrivee', 'heure_depart', 'heures_travaillees').order_by('day')
 
     # Calcul des totaux
     total_presences = sum([p['countP'] for p in presences])
@@ -289,8 +306,6 @@ def rapport(request):
         'date_fin': date_fin.strftime('%Y-%m-%d'),
         'countP': total_presences,
         'countA': total_absences,
+        'presences': presences,
     }
-
     return render(request, 'rapport/rapport.html', context)
-def login(request):
-    return render(request, 'auth.html')
