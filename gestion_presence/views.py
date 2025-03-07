@@ -249,14 +249,14 @@ def presence(request):
 
 
 
-
 from django.shortcuts import render
-from django.db.models import F, Case, When, Value, IntegerField, Count, ExpressionWrapper, fields
-from django.db.models.functions import TruncDay
+from django.db.models import F, Case, When, Value, IntegerField, Count, ExpressionWrapper, DurationField
+from django.db.models.functions import TruncDay, Extract
+from django.utils import timezone
 from datetime import datetime
 from .models import Presence
 
-def rapport(request): 
+def rapport(request):
     """ Génère un rapport pour un employé ou pour le mois en cours. """
     
     # Récupération des données du formulaire
@@ -266,13 +266,13 @@ def rapport(request):
     
     # Si aucune date n'est fournie, on prend les valeurs par défaut du mois en cours
     if not date_debut or not date_fin:
-        today = datetime.now()
+        today = timezone.now()
         date_debut = today.replace(day=1)  # Premier jour du mois
         date_fin = today  # Aujourd'hui
     else:
         # Conversion des dates en objets datetime
-        date_debut = datetime.strptime(date_debut, '%Y-%m-%d')
-        date_fin = datetime.strptime(date_fin, '%Y-%m-%d')
+        date_debut = timezone.make_aware(datetime.strptime(date_debut, '%Y-%m-%d'))
+        date_fin = timezone.make_aware(datetime.strptime(date_fin, '%Y-%m-%d'))
 
     # Filtrage des présences en fonction du nom et de la plage de dates
     presences = Presence.objects.filter(
@@ -282,19 +282,20 @@ def rapport(request):
         day=TruncDay('date'),  # Regroupement par jour
         countP=Count(Case(When(status='P', then=1), output_field=IntegerField())),  # Comptage des présences
         countA=Count(Case(When(status='A', then=1), output_field=IntegerField())),  # Comptage des absences
-        heure_arrivee=F('heure_arrivee'),
-        heure_depart=F('heure_depart'),
+        arrival_time=F('heure_arrivee'),  # Renamed to avoid conflict
+        departure_time=F('heure_depart'),  # Renamed to avoid conflict
         heures_travaillees=ExpressionWrapper(
             Case(
-                # Cas Présent : Calcul de la durée travaillée
-                When(status='P', then=F('heure_depart') - F('heure_arrivee')),
-                # Cas Absent : Temps non travaillé (9h moins le temps présent)
-                When(status='A', then=Value(9 * 3600) - (F('heure_depart') - F('heure_arrivee'))),
-                default=Value(0),  # Valeur par défaut si aucun statut
-                output_field=fields.DurationField(),
-            )
+                When(status='P', then=Extract(F('heure_depart'), 'epoch') - Extract(F('heure_arrivee'), 'epoch')),
+                When(status='A', then=Value(0)),  # Absent: 0 hours worked
+                When(status='R', then=Extract(F('heure_depart'), 'epoch') - Extract(F('heure_arrivee'), 'epoch')),  # Retard: partial hours
+                When(status='E', then=Value(0)),  # Exempté: 0 hours worked
+                default=Value(0),
+                output_field=DurationField(),
+            ),
+            output_field=DurationField()
         )
-    ).values('day', 'countP', 'countA', 'heure_arrivee', 'heure_depart', 'heures_travaillees').order_by('day')
+    ).values('day', 'countP', 'countA', 'arrival_time', 'departure_time', 'heures_travaillees').order_by('day')
 
     # Calcul des totaux
     total_presences = sum([p['countP'] for p in presences])
