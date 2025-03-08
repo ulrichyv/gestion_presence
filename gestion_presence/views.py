@@ -247,30 +247,32 @@ def generer_badge(request):
 def presence(request):
     return render(request, 'presence.html')
 
+def login(request):
+    return render(request, 'auth.html')
+
 
 
 from django.shortcuts import render
-from django.db.models import F, Case, When, Value, IntegerField, Count, ExpressionWrapper, DurationField
-from django.db.models.functions import TruncDay, Extract
 from django.utils import timezone
+from django.db.models import Count, Case, When, IntegerField, F, Value, ExpressionWrapper
+from django.db.models.functions import TruncDay, Extract
 from datetime import datetime
 from .models import Presence
 
 def rapport(request):
-    """ Génère un rapport pour un employé ou pour le mois en cours. """
-    
+    """ Génère un rapport pour tous les employés ou un employé spécifique. """
+
     # Récupération des données du formulaire
-    nom = request.POST.get("nom", "")  # Nom de l'employé (facultatif)
+    nom = request.POST.get("nom", "").strip()  # Nom de l'employé (facultatif)
     date_debut = request.POST.get("Date_deb", None)
     date_fin = request.POST.get("Date_fin", None)
-    
-    # Si aucune date n'est fournie, on prend les valeurs par défaut du mois en cours
+
+    # Si aucune date n'est fournie, on prend le mois en cours
+    today = timezone.now()
     if not date_debut or not date_fin:
-        today = timezone.now()
         date_debut = today.replace(day=1)  # Premier jour du mois
         date_fin = today  # Aujourd'hui
     else:
-        # Conversion des dates en objets datetime
         date_debut = timezone.make_aware(datetime.strptime(date_debut, '%Y-%m-%d'))
         date_fin = timezone.make_aware(datetime.strptime(date_fin, '%Y-%m-%d'))
 
@@ -280,33 +282,49 @@ def rapport(request):
         date__range=[date_debut, date_fin]
     ).annotate(
         day=TruncDay('date'),  # Regroupement par jour
-        countP=Count(Case(When(status='P', then=1), output_field=IntegerField())),  # Comptage des présences
-        countA=Count(Case(When(status='A', then=1), output_field=IntegerField())),  # Comptage des absences
-        arrival_time=F('heure_arrivee'),  # Renamed to avoid conflict
-        departure_time=F('heure_depart'),  # Renamed to avoid conflict
+        countP=Count(Case(When(status='P', then=1), output_field=IntegerField())),  # Présences
+        countA=Count(Case(When(status='A', then=1), output_field=IntegerField())),  # Absences
         heures_travaillees=ExpressionWrapper(
             Case(
-                When(status='P', then=Extract(F('heure_depart'), 'epoch') - Extract(F('heure_arrivee'), 'epoch')),
-                When(status='A', then=Value(0)),  # Absent: 0 hours worked
-                When(status='R', then=Extract(F('heure_depart'), 'epoch') - Extract(F('heure_arrivee'), 'epoch')),  # Retard: partial hours
-                When(status='E', then=Value(0)),  # Exempté: 0 hours worked
+                When(status='P', then=Extract(F('heure_depart'), 'hour') - Extract(F('heure_arrivee'), 'hour')),
+                When(status='A', then=Value(0)),
+                When(status='R', then=Extract(F('heure_depart'), 'hour') - Extract(F('heure_arrivee'), 'hour')),
+                When(status='E', then=Value(0)),
                 default=Value(0),
-                output_field=DurationField(),
+                output_field=IntegerField(),
             ),
-            output_field=DurationField()
+            output_field=IntegerField()
         )
-    ).values('day', 'countP', 'countA', 'arrival_time', 'departure_time', 'heures_travaillees').order_by('day')
+    ).values('user__first_name', 'day', 'countP', 'countA', 'heures_travaillees').order_by('user__first_name', 'day')
 
-    # Calcul des totaux
-    total_presences = sum([p['countP'] for p in presences])
-    total_absences = sum([p['countA'] for p in presences])
+    # Regrouper les données par employé
+    employes = {}
+    for presence in presences:
+        employe = presence['user__first_name']
+        if employe not in employes:
+            employes[employe] = {'jours': [], 'totalP': 0, 'totalA': 0, 'total_heures': 0}
+        
+        # Remplacement des valeurs None par 0
+        countP = presence['countP'] or 0
+        countA = presence['countA'] or 0
+        heures_travaillees = presence['heures_travaillees'] or 0
+        
+        employes[employe]['jours'].append({
+            'date': presence['day'].strftime('%Y-%m-%d'),
+            'presences': countP,
+            'absences': countA,
+            'heures': heures_travaillees
+        })
+        
+        # Mise à jour des totaux
+        employes[employe]['totalP'] += countP
+        employes[employe]['totalA'] += countA
+        employes[employe]['total_heures'] += heures_travaillees
 
     context = {
-        'nom': nom,
         'date_debut': date_debut.strftime('%Y-%m-%d'),
         'date_fin': date_fin.strftime('%Y-%m-%d'),
-        'countP': total_presences,
-        'countA': total_absences,
-        'presences': presences,
+        'employes': employes,
     }
     return render(request, 'rapport/rapport.html', context)
+

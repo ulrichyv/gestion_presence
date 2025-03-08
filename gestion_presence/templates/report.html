@@ -22,7 +22,7 @@
                             <th>Fonction</th>
                             <th>Matricule</th>
                             <th>CNI</th>
-                            <th>Présences</th>
+                            
                             <th>Télécharger Badge</th>
                         </tr>
                     </thead>
@@ -32,7 +32,7 @@
                             <th>Fonction</th>
                             <th>Matricule</th>
                             <th>CNI</th>
-                            <th>Présences</th>
+                            
                             <th>Télécharger Badge</th>
                         </tr>
                     </tfoot>
@@ -43,13 +43,6 @@
                             <td>{{ data.user.fonction }}</td>
                             <td>{{ data.user.matricule }}</td>
                             <td>{{ data.user.cni }}</td>
-                            <td>
-                                <ul>
-                                    {% for presence in data.presences %}
-                                    <li>{{ presence.date }} - {{ presence.get_status_display }} ({{ presence.heure_arrivee }} - {{ presence.heure_depart }})</li>
-                                    {% endfor %}
-                                </ul>
-                            </td>
                             <td>
                                 {% if data.user.path_badge %}
                                     <a href="{{ data.user.path_badge }}" download>
