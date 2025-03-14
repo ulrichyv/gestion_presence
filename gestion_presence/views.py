@@ -31,6 +31,10 @@ from django.shortcuts import render
 from datetime import datetime
 from django.db.models import Count, Case, When, IntegerField
 from django.db.models.functions import TruncDay
+from django.contrib.auth import authenticate
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout
+from django.contrib.auth.hashers import make_password
 
 @api_view(['POST'])
 def scan(request):
@@ -179,6 +183,9 @@ def generer_badge(request):
         matricule = request.POST.get("matricule")
         cni = request.POST.get("cni")
         photo = request.FILES.get("photo")
+        mail=request.POST.get("email")
+        password=request.POST.get("password")
+        password=make_password(password)
 
         # Validation des champs
         if not all([nom, prenom, fonction, matricule, cni, photo]):
@@ -228,6 +235,8 @@ def generer_badge(request):
                 cni=cni,
                 matricule=matricule,
                 fonction=fonction,
+                email=mail,
+                password=password,
                 path_qr_code=request.build_absolute_uri(qr_url),
                 path_badge=f"/media/badge_final_{nom}_{prenom}.png",
                 path_photo=request.build_absolute_uri(photo_url),
@@ -328,3 +337,23 @@ def rapport(request):
     }
     return render(request, 'rapport/rapport.html', context)
 
+def process_login(request):
+    if request.method == "POST":
+        email = request.POST['email']
+        password = request.POST['password']
+        user = authenticate(request, username=email, password=password)
+
+        if user is not None:
+            auth_login(request, user)
+
+            # À ce stade, l'utilisateur est connecté, et vous pouvez accéder à ses informations
+            user = user.get_full_name()  # ou user.username si vous voulez le nom d'utilisateur
+
+            # Passer le nom de l'utilisateur au template
+            return redirect('accueil')
+
+        else:
+            messages.error(request, 'Identifiants invalides. Vérifiez votre adresse mail ou mot de passe et recommencez.')
+            return render(request, 'auth.html')
+    # Si ce n'est pas une requête POST, redirigez vers la page de connexion
+    return redirect('')

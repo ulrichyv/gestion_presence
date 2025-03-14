@@ -21,7 +21,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 urlpatterns = [
    path('admin/', admin.site.urls),
-    path('', views.index, name='index'),
+    path('accueil', views.index, name='index'),
     path('report', views.report, name='report'),
     path('formulaire', views.formulaire, name='formulaire'),
     path('generer_badge', views.generer_badge, name='generer_badge'),
@@ -29,4 +29,5 @@ urlpatterns = [
     path('rapport', views.rapport, name='rapport'),
     path('login', views.login, name='login'),
     path('api/scan_qr_code/', views.scan_qr_code, name='scan-qr-code'),
+    path('process_login', views.process_login, name='process_login'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
