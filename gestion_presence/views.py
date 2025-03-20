@@ -35,6 +35,9 @@ from django.contrib.auth import authenticate
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth import get_user_model
+
+import logging
 
 @api_view(['POST'])
 def scan(request):
@@ -175,6 +178,26 @@ def generate_badge_from_html(badge_html, nom, prenom):
     
     return final_image_path
 
+  # Assure-toi que User est bien importé
+
+
+
+logger = logging.getLogger(__name__)
+
+import os
+import random
+import qrcode
+import json
+from django.conf import settings
+from django.core.files.storage import FileSystemStorage
+from django.contrib import messages
+from django.shortcuts import render, redirect
+from django.template.loader import render_to_string
+from django.contrib.auth import get_user_model
+import logging
+
+logger = logging.getLogger(__name__)
+
 def generer_badge(request):
     if request.method == "POST":
         nom = request.POST.get("nom")
@@ -183,12 +206,11 @@ def generer_badge(request):
         matricule = request.POST.get("matricule")
         cni = request.POST.get("cni")
         photo = request.FILES.get("photo")
-        mail=request.POST.get("email")
-        password=request.POST.get("password")
-        password=make_password(password)
+        email = request.POST.get("email")
+        password = request.POST.get("password")
 
-        # Validation des champs
-        if not all([nom, prenom, fonction, matricule, cni, photo]):
+        # Vérification des champs obligatoires
+        if not all([nom, prenom, fonction, matricule, cni, photo, email, password]):
             messages.error(request, "Tous les champs et la photo doivent être remplis.")
             return redirect("formulaire")
 
@@ -197,17 +219,28 @@ def generer_badge(request):
         photo_filename = f"photos/{nom}_{prenom}.jpg".replace(" ", "_")
         photo_path = fs.save(photo_filename, photo)
         photo_url = fs.url(photo_path)
+        print(f"Photo sauvegardée : {photo_url}")
 
-        # Génération du QR code
-        qr_data = f"Nom: {nom}, Prénom: {prenom}, Matricule: {matricule}"
-        qr = qrcode.make(qr_data)
+        # 📌 Correction du QR Code : JSON au lieu de texte brut
+        qr_data = {
+            "nom": nom,
+            "prenom": prenom,
+            "matricule": matricule,
+            "fonction": fonction,
+            "cni": cni
+        }
+        qr_json = json.dumps(qr_data)
+
+        # Génération et sauvegarde du QR Code
+        qr = qrcode.make(qr_json)
         qr_filename = f"qr_codes/qr_{nom}_{prenom}.png".replace(" ", "_")
         qr_path = os.path.join(settings.MEDIA_ROOT, qr_filename)
         os.makedirs(os.path.dirname(qr_path), exist_ok=True)
         qr.save(qr_path)
         qr_url = fs.url(qr_filename)
+        print(f"QR code généré : {qr_url}")
 
-        # Rendu du HTML
+        # Génération du badge
         badge_html = render_to_string(
             "badge.html",
             {
@@ -222,44 +255,43 @@ def generer_badge(request):
             },
         )
 
-        # Génération du badge final
         badge_image = generate_badge_from_html(badge_html, nom, prenom)
+        badge_path = f"/media/badge_final_{nom}_{prenom}.png".replace(" ", "_")
 
         # Création de l'utilisateur
+        User = get_user_model()
         try:
             username = f"{nom.lower()}_{prenom.lower()}_{random.randint(1000, 9999)}"
-            user = User.objects.create(
-                username=username,  # Ajout du username unique
+            user = User.objects.create_user(
+                username=username,
                 first_name=nom,
                 last_name=prenom,
+                email=email,
+                password=password,
                 cni=cni,
                 matricule=matricule,
                 fonction=fonction,
-                email=mail,
-                password=password,
-                path_qr_code=request.build_absolute_uri(qr_url),
-                path_badge=f"/media/badge_final_{nom}_{prenom}.png",
-                path_photo=request.build_absolute_uri(photo_url),
-                qr_data=qr_data,  # Stockage des données du QR code
+                path_qr_code=qr_url,
+                path_badge=badge_path,
+                path_photo=photo_url,
+                qr_data=qr_json,  # 📌 Stockage du QR Code au format JSON
             )
-            print(user.qr_data)  # Vérification que les données du QR sont bien stockées
+            print(f"Utilisateur créé : {user.username}")
         except Exception as e:
-            messages.error(request, f"Une erreur est survenue : {e}")
+            logger.error(f"Erreur lors de la création de l'utilisateur : {e}")
+            messages.error(request, f"Erreur lors de la création de l'utilisateur : {e}")
             return redirect("formulaire")
 
-        messages.success(request, "Badge généré avec succès!")
+        messages.success(request, "Badge généré avec succès !")
         return redirect("/")
 
     return render(request, "create_badge_form.html")
-
 
 def presence(request):
     return render(request, 'presence.html')
 
 def login(request):
     return render(request, 'auth.html')
-
-
 
 from django.shortcuts import render
 from django.utils import timezone
@@ -337,23 +369,25 @@ def rapport(request):
     }
     return render(request, 'rapport/rapport.html', context)
 
+
 def process_login(request):
     if request.method == "POST":
-        email = request.POST['email']
-        password = request.POST['password']
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        
+        # Authentification de l'utilisateur
         user = authenticate(request, username=email, password=password)
-
+        print(user)
+        
         if user is not None:
+            # Connexion de l'utilisateur
             auth_login(request, user)
-
-            # À ce stade, l'utilisateur est connecté, et vous pouvez accéder à ses informations
-            user = user.get_full_name()  # ou user.username si vous voulez le nom d'utilisateur
-
-            # Passer le nom de l'utilisateur au template
-            return redirect('accueil')
-
+            messages.success(request, f"Bienvenue, {user.get_full_name()} !")
+            return redirect('accueil')  # Redirige vers la page d'accueil
         else:
+            # Affichage d'un message d'erreur si l'authentification échoue
             messages.error(request, 'Identifiants invalides. Vérifiez votre adresse mail ou mot de passe et recommencez.')
-            return render(request, 'auth.html')
-    # Si ce n'est pas une requête POST, redirigez vers la page de connexion
-    return redirect('')
+            return redirect('/')  # Redirige vers la page de connexion
+    
+    # Si ce n'est pas une requête POST, redirige vers la page de connexion
+    return redirect('/')

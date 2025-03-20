@@ -1,12 +1,12 @@
 {% extends 'home.html' %}
 
 {% block content %}
-<div class="page-wrapper d-flex align-items-center justify-content-center">
+<div class="page-wrapper d-flex align-items-center justify-content-center min-vh-100">
     <div class="row justify-content-center w-100">
         <div class="col-md-8 col-lg-6 col-xxl-4">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h4 class="text-center mb-4">Créer un employé</h4>
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-4">
+                    <h4 class="text-center mb-4 fw-bold">Créer un employé</h4>
                     
                     <!-- Affichage des messages -->
                     {% if messages %}
@@ -20,46 +20,47 @@
                     <!-- Formulaire d'inscription -->
                     <form action="/generer_badge" enctype="multipart/form-data" method="post">
                         {% csrf_token %}
-                        
+
                         <div class="mb-3">
-                            <label for="nom" class="form-label">Nom</label>
+                            <label for="nom" class="form-label fw-semibold">Nom</label>
                             <input type="text" class="form-control" id="nom" name="nom" required>
                         </div>
-                        
+
                         <div class="mb-3">
-                            <label for="prenom" class="form-label">Prénom</label>
+                            <label for="prenom" class="form-label fw-semibold">Prénom</label>
                             <input type="text" class="form-control" id="prenom" name="prenom" required>
                         </div>
-                        
+
                         <div class="mb-3">
-                            <label for="fonction" class="form-label">Fonction</label>
+                            <label for="fonction" class="form-label fw-semibold">Fonction</label>
                             <input type="text" class="form-control" id="fonction" name="fonction" required>
                         </div>
-                        
+
                         <div class="mb-3">
-                            <label for="matricule" class="form-label">Matricule</label>
+                            <label for="matricule" class="form-label fw-semibold">Matricule</label>
                             <input type="text" class="form-control" id="matricule" name="matricule" required>
                         </div>
-                        
+
                         <div class="mb-3">
-                            <label for="cni" class="form-label">Numéro de CNI</label>
+                            <label for="cni" class="form-label fw-semibold">Numéro de CNI</label>
                             <input type="text" class="form-control" id="cni" name="cni" required>
                         </div>
-                       
+
                         <div class="mb-3">
-                            <label for="exampleInputEmail1" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" name="email" required>
-                          </div>
+                            <label for="email" class="form-label fw-semibold">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
                         </div>
+
                         <div class="mb-3">
-                            <label for="exampleInputPassword" class="form-label">password</label>
-                            <input type="password" class="form-control form-control-user"
-                                id="exampleInputPassword" placeholder="Password" name="password" >
+                            <label for="password" class="form-label fw-semibold">Mot de passe</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
                         </div>
+
                         <div class="mb-3">
-                            <label for="photo" class="form-label">Photo</label>
+                            <label for="photo" class="form-label fw-semibold">Photo</label>
                             <input type="file" class="form-control" id="photo" name="photo" accept="image/*" required>
-                        
+                        </div>
+
                         <div class="d-flex align-items-center justify-content-center">
                             <button type="submit" class="btn btn-primary w-100">Créer un utilisateur</button>
                         </div>
