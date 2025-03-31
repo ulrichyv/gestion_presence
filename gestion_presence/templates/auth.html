@@ -13,7 +13,7 @@
     <!-- Custom fonts for this template -->
     <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
     <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
-
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <!-- Custom styles for this template -->
     <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
     <link href="{% static 'vendor/datatables/dataTables.bootstrap4.min.css' %}" rel="stylesheet">
@@ -89,7 +89,7 @@
                     <h1 class="h4 text-gray-900 mb-4">Welcome Back!</h1>
                 </div>
                 <form action="{% url 'process_login' %}" method="post" class="needs-validation user" novalidate>
-                    {% csrf_token %}
+                    {% csrf_token %} 
                     
                     <!-- Email Input -->
                     <div class="form-group">
@@ -99,9 +99,14 @@
                     </div>
                 
                     <!-- Password Input -->
-                    <div class="form-group">
-                        <input type="password" name="password" class="form-control form-control-user"
-                            id="exampleInputPassword" placeholder="Password" required>
+                    <div class="mb-3">
+                        <label for="password" class="form-label fw-semibold">Mot de passe</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="password" name="password" required>
+                            <button type="button" class="btn btn-outline-secondary" id="togglePassword">
+                                <i class="fas fa-eye"></i>  <!-- Icône "œil" de FontAwesome -->
+                            </button>
+                        </div>
                     </div>
                 
                     <!-- Remember Me Checkbox -->
@@ -122,7 +127,23 @@
             </div>
         </div>
     </div>
-
+    <script>
+        document.getElementById('togglePassword').addEventListener('click', function () {
+            const passwordInput = document.getElementById('password');
+            const icon = this.querySelector('i');
+    
+            // Basculer entre type="password" et type="text"
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');  // Changer l'icône en "œil barré"
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');  // Revenir à l'icône "œil"
+            }
+        });
+    </script>
     <!-- JavaScript Libraries -->
     <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
     <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>

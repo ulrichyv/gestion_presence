@@ -82,6 +82,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+AUTHENTICATION_BACKENDS = [
+    'gestion_presence.authentication.EmailAuthBackend',  # 🔥 Backend personnalisé pour l'email
+    'django.contrib.auth.backends.ModelBackend',  # Backend Django par défaut
+    
+]
 
 DATABASES = {
     'default': {

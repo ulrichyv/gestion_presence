@@ -9,6 +9,20 @@ class User(AbstractUser):
     path_badge = models.ImageField(upload_to='badges/', blank=True, null=True, max_length=255)
     path_photo = models.ImageField(upload_to='photos/', blank=True, null=True, max_length=255)
     qr_data = models.TextField(default='')  # Ajout d'une valeur par défaut
+    email = models.EmailField(unique=True)
+    username = models.CharField(max_length=150, default='Null', blank=True, null=True)
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
+
+    def __str__(self):
+        return self.email
+
+    def save(self, *args, **kwargs):
+        # Normalisation de l'email AVANT la sauvegarde
+        if self.email:
+            self.email = self.email.lower()
+        super().save(*args, **kwargs)  # 📌 Ajout du super().save() pour sauvegarder l'utilisateur
+
 
 class Presence(models.Model):
     STATUS_CHOICES = [

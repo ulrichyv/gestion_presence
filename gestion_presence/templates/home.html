@@ -270,7 +270,7 @@
                             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
                                 data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                         {% if user.is_authenticated %}
-                                        <span class="">Bonjour, {{ user.username }}</span>
+                                        <span class="">Bonjour, {{ user.first_name }}</span>
                                 {% else %}
                                         <span>Utilisateur non connecté</span>
                                 {% endif %}

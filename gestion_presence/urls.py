@@ -21,7 +21,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 urlpatterns = [
    path('admin/', admin.site.urls),
-    path('accueil', views.index, name='index'),
+    path('accueil/', views.index, name='index'),
     path('report', views.report, name='report'),
     path('formulaire', views.formulaire, name='formulaire'),
     path('generer_badge', views.generer_badge, name='generer_badge'),

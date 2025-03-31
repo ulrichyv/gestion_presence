@@ -206,11 +206,12 @@ def generer_badge(request):
         matricule = request.POST.get("matricule")
         cni = request.POST.get("cni")
         photo = request.FILES.get("photo")
-        email = request.POST.get("email")
-        password = request.POST.get("password")
+        mail=request.POST.get("email")
+        password=request.POST.get("password")
+       
 
-        # Vérification des champs obligatoires
-        if not all([nom, prenom, fonction, matricule, cni, photo, email, password]):
+        # Validation des champs
+        if not all([nom, prenom, fonction, matricule, cni, photo]):
             messages.error(request, "Tous les champs et la photo doivent être remplis.")
             return redirect("formulaire")
 
@@ -221,7 +222,7 @@ def generer_badge(request):
         photo_url = fs.url(photo_path)
         print(f"Photo sauvegardée : {photo_url}")
 
-        # 📌 Correction du QR Code : JSON au lieu de texte brut
+        # Génération du QR code
         qr_data = {
             "nom": nom,
             "prenom": prenom,
@@ -240,12 +241,12 @@ def generer_badge(request):
         qr_url = fs.url(qr_filename)
         print(f"QR code généré : {qr_url}")
 
-        # Génération du badge
+        # Rendu du HTML
         badge_html = render_to_string(
             "badge.html",
             {
-                "firstname": nom,
-                "lastname": prenom,
+                "nom": nom,
+                "prenom": prenom,
                 "fonction": fonction,
                 "matricule": matricule,
                 "cni": cni,
@@ -255,37 +256,37 @@ def generer_badge(request):
             },
         )
 
+        # Génération du badge final
         badge_image = generate_badge_from_html(badge_html, nom, prenom)
-        badge_path = f"/media/badge_final_{nom}_{prenom}.png".replace(" ", "_")
 
         # Création de l'utilisateur
-        User = get_user_model()
         try:
             username = f"{nom.lower()}_{prenom.lower()}_{random.randint(1000, 9999)}"
             user = User.objects.create_user(
-                username=username,
+                username=username,  # Ajout du username unique
                 first_name=nom,
                 last_name=prenom,
-                email=email,
-                password=password,
                 cni=cni,
                 matricule=matricule,
                 fonction=fonction,
-                path_qr_code=qr_url,
-                path_badge=badge_path,
-                path_photo=photo_url,
-                qr_data=qr_json,  # 📌 Stockage du QR Code au format JSON
+                email=mail,
+                password=password,
+                path_qr_code=request.build_absolute_uri(qr_url),
+                path_badge=f"/media/badge_final_{nom}_{prenom}.png",
+                path_photo=request.build_absolute_uri(photo_url),
+                qr_data=qr_data,  # Stockage des données du QR code
             )
-            print(f"Utilisateur créé : {user.username}")
+            print(user.qr_data)  # Vérification que les données du QR sont bien stockées
         except Exception as e:
-            logger.error(f"Erreur lors de la création de l'utilisateur : {e}")
-            messages.error(request, f"Erreur lors de la création de l'utilisateur : {e}")
+            messages.error(request, f"Une erreur est survenue : {e}")
             return redirect("formulaire")
 
-        messages.success(request, "Badge généré avec succès !")
-        return redirect("/")
+        messages.success(request, "Badge généré avec succès!")
+        return redirect("accueil/")
 
     return render(request, "create_badge_form.html")
+
+
 
 def presence(request):
     return render(request, 'presence.html')
@@ -370,24 +371,50 @@ def rapport(request):
     return render(request, 'rapport/rapport.html', context)
 
 
+from django.contrib.auth import authenticate
+from django.shortcuts import redirect
+from django.contrib import messages
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout
+from django.contrib.auth import get_backends
+
+from django.contrib.auth import authenticate, login as auth_login
+from django.shortcuts import redirect, render
+
 def process_login(request):
     if request.method == "POST":
-        email = request.POST.get('email')
-        password = request.POST.get('password')
-        
-        # Authentification de l'utilisateur
-        user = authenticate(request, username=email, password=password)
-        print(user)
-        
+        email = request.POST.get('email', '').strip().lower()
+        password = request.POST.get('password', '').strip()
+
+        print(f"Tentative de connexion : {email} | {password}")
+
+        # Vérifiez si l'utilisateur existe dans la base de données
+        try:
+            user = User.objects.get(email=email)
+            print(f"Utilisateur trouvé : {user}")
+            print(f"Mot de passe valide : {user.check_password(password)}")
+        except User.DoesNotExist:
+            print("Utilisateur non trouvé")
+            messages.error(request, 'Identifiants invalides. Vérifiez votre adresse mail ou mot de passe.')
+            return render(request, 'auth.html')
+
+        # Authentifiez l'utilisateur
+        user = authenticate(request, email=email, password=password)
+        print(f"Utilisateur authentifié : {user}")
+
         if user is not None:
-            # Connexion de l'utilisateur
             auth_login(request, user)
-            messages.success(request, f"Bienvenue, {user.get_full_name()} !")
-            return redirect('accueil')  # Redirige vers la page d'accueil
+            messages.success(request, f'Bienvenue, {user.get_full_name()}!')
+            return redirect('accueil/')  # Redirigez vers la page d'accueil
         else:
-            # Affichage d'un message d'erreur si l'authentification échoue
-            messages.error(request, 'Identifiants invalides. Vérifiez votre adresse mail ou mot de passe et recommencez.')
-            return redirect('/')  # Redirige vers la page de connexion
-    
-    # Si ce n'est pas une requête POST, redirige vers la page de connexion
+            messages.error(request, 'Identifiants invalides. Vérifiez votre adresse mail ou mot de passe.')
+            return render(request, 'auth.html')
+
+    return redirect('/')
+
+from django.contrib.auth import logout as auth_logout
+
+def logout_user(request):
+    auth_logout(request)
+    messages.success(request, 'Vous avez été déconnecté.')
     return redirect('/')
