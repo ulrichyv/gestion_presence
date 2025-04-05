@@ -39,77 +39,71 @@ from django.contrib.auth import get_user_model
 
 import logging
 
-@api_view(['POST'])
-def scan(request):
-    qr_data = request.data.get('qr_data')
-    
-    if not qr_data:
-        return Response({'message': 'QR data is missing'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    try:
-        # Supposons que le QR code contient "Nom: John, Matricule: 1234"
-        data = qr_data.split(",")  
-        if len(data) < 2:
-            return Response({'message': 'Format du QR Code invalide'}, status=status.HTTP_400_BAD_REQUEST)
-
-        nom = data[0].split(":")[1].strip()
-        matricule = data[1].split(":")[1].strip()
-
-        # Vérifier si l'utilisateur existe
-        user = User.objects.get(matricule=matricule)
-
-        # Vérifier s'il y a déjà une présence aujourd'hui
-        today = datetime.now().date()
-        presence, created = Presence.objects.get_or_create(
-            user=user,
-            date=today,
-            defaults={'status': 'P', 'heure_arrivee': datetime.now().time()}
-        )
-
-        if not created:
-            return Response({'message': f"{nom} a déjà été marqué présent aujourd'hui."}, status=status.HTTP_200_OK)
-        
-        return Response({'message': f'{nom} est maintenant marqué comme présent'}, status=status.HTTP_201_CREATED)
-
-    except User.DoesNotExist:
-        return Response({'message': 'Utilisateur non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from datetime import datetime, time
+from .models import User, Presence
 
 @api_view(['POST'])
 def scan_qr_code(request):
     try:
+        # Récupérer les données JSON envoyées par le QR Code
         qr_data = request.data.get('qr_data')
-        print(f"Données reçues : {request.data}")  # Log des données reçues pour le débogage
+        print(f"Données reçues : {qr_data}")  # Log des données reçues pour le débogage
+        
         if not qr_data:
             return Response({'message': 'Données QR manquantes'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Supposons que le QR code contient "Nom: John, Matricule: 1234"
-        data = qr_data.split(",")  
-        if len(data) < 2:
-            return Response({'message': 'Format du QR Code invalide'}, status=status.HTTP_400_BAD_REQUEST)
 
-        nom = data[0].split(":")[1].strip()
-        matricule = data[1].split(":")[1].strip()
+        # Supposons que le QR Code contient des données JSON comme {"nom": "John", "matricule": "1234"}
+        try:
+            qr_info = json.loads(qr_data)  # Essayer de parser les données JSON
+            nom = qr_info.get('nom')
+            matricule = qr_info.get('matricule')
+
+            if not nom or not matricule:
+                return Response({'message': 'Données QR invalides'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        except json.JSONDecodeError:
+            return Response({'message': 'Le QR Code n\'est pas un JSON valide'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Vérifier si l'utilisateur existe
         user = User.objects.get(matricule=matricule)
 
+        # Récupérer l'heure actuelle
+        now = datetime.now()
+        current_time = now.time()
+
         # Vérifier s'il y a déjà une présence aujourd'hui
-        today = datetime.now().date()
+        today = now.date()
         presence, created = Presence.objects.get_or_create(
             user=user,
             date=today,
-            defaults={'status': 'P', 'heure_arrivee': datetime.now().time()}
+            defaults={'status': 'P'}
         )
 
-        if not created:
-            return Response({'message': f"{nom} a déjà été marqué présent aujourd'hui."}, status=status.HTTP_200_OK)
+        # Déterminer si c'est une heure d'arrivée ou de départ
+        if current_time < time(14, 0):  # Avant 14h
+            if not presence.heure_arrivee:
+                presence.heure_arrivee = current_time
+                presence.save()
+                return Response({'message': f'{nom} est marqué comme présent à {presence.heure_arrivee}'}, status=status.HTTP_201_CREATED)
+            else:
+                return Response({'message': f'{nom} est déjà marqué comme arrivé aujourd\'hui.'}, status=status.HTTP_200_OK)
         
-        return Response({'message': f'{nom} est maintenant marqué comme présent'}, status=status.HTTP_201_CREATED)
+        else:  # Après 14h (heure de départ)
+            if not presence.heure_depart:
+                presence.heure_depart = current_time
+                presence.save()
+                return Response({'message': f'{nom} est marqué comme parti à {presence.heure_depart}'}, status=status.HTTP_201_CREATED)
+            else:
+                return Response({'message': f'{nom} est déjà marqué comme parti aujourd\'hui.'}, status=status.HTTP_200_OK)
 
     except User.DoesNotExist:
         return Response({'message': 'Utilisateur non trouvé'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 def index(request):
     users = User.objects.all()  # Récupère tous les utilisateurs
@@ -294,18 +288,21 @@ def presence(request):
 def login(request):
     return render(request, 'auth.html')
 
-from django.shortcuts import render
-from django.utils import timezone
-from django.db.models import Count, Case, When, IntegerField, F, Value, ExpressionWrapper
-from django.db.models.functions import TruncDay, Extract
 from datetime import datetime
+from django.utils import timezone
+from django.db.models import Sum, Case, When, Value, F, ExpressionWrapper, DurationField
+from django.db.models.functions import TruncDay
+from django.shortcuts import render
 from .models import Presence
+
+from datetime import timedelta
+from datetime import datetime, timedelta
 
 def rapport(request):
     """ Génère un rapport pour tous les employés ou un employé spécifique. """
 
     # Récupération des données du formulaire
-    nom = request.POST.get("nom", "").strip()  # Nom de l'employé (facultatif)
+    nom = request.POST.get("nom", "").strip()
     date_debut = request.POST.get("Date_deb", None)
     date_fin = request.POST.get("Date_fin", None)
 
@@ -318,50 +315,72 @@ def rapport(request):
         date_debut = timezone.make_aware(datetime.strptime(date_debut, '%Y-%m-%d'))
         date_fin = timezone.make_aware(datetime.strptime(date_fin, '%Y-%m-%d'))
 
-    # Filtrage des présences en fonction du nom et de la plage de dates
+    # Heures standard de travail (7h30 à 17h30)
+    heure_arrivee_standard = timedelta(hours=7, minutes=30)
+    heure_depart_standard = timedelta(hours=17, minutes=30)
+    
+    # Récupérer toutes les présences
     presences = Presence.objects.filter(
         user__first_name__icontains=nom,
         date__range=[date_debut, date_fin]
-    ).annotate(
-        day=TruncDay('date'),  # Regroupement par jour
-        countP=Count(Case(When(status='P', then=1), output_field=IntegerField())),  # Présences
-        countA=Count(Case(When(status='A', then=1), output_field=IntegerField())),  # Absences
-        heures_travaillees=ExpressionWrapper(
-            Case(
-                When(status='P', then=Extract(F('heure_depart'), 'hour') - Extract(F('heure_arrivee'), 'hour')),
-                When(status='A', then=Value(0)),
-                When(status='R', then=Extract(F('heure_depart'), 'hour') - Extract(F('heure_arrivee'), 'hour')),
-                When(status='E', then=Value(0)),
-                default=Value(0),
-                output_field=IntegerField(),
-            ),
-            output_field=IntegerField()
-        )
-    ).values('user__first_name', 'day', 'countP', 'countA', 'heures_travaillees').order_by('user__first_name', 'day')
+    ).order_by('user__first_name', 'date')
 
     # Regrouper les données par employé
     employes = {}
     for presence in presences:
-        employe = presence['user__first_name']
+        employe = presence.user.first_name  # Utilisation de l'utilisateur plutôt que de 'user__first_name'
+        
         if employe not in employes:
-            employes[employe] = {'jours': [], 'totalP': 0, 'totalA': 0, 'total_heures': 0}
-        
-        # Remplacement des valeurs None par 0
-        countP = presence['countP'] or 0
-        countA = presence['countA'] or 0
-        heures_travaillees = presence['heures_travaillees'] or 0
-        
-        employes[employe]['jours'].append({
-            'date': presence['day'].strftime('%Y-%m-%d'),
-            'presences': countP,
-            'absences': countA,
-            'heures': heures_travaillees
-        })
-        
-        # Mise à jour des totaux
-        employes[employe]['totalP'] += countP
-        employes[employe]['totalA'] += countA
-        employes[employe]['total_heures'] += heures_travaillees
+            employes[employe] = {'jours': [], 'totalP': 0, 'totalA': 0, 'total_heures': 0, 'total_heures_sup': 0, 'total_heures_absence': 0}
+
+        # Vérifier si heure_arrivee et heure_depart ne sont pas None avant d'y accéder
+        if presence.heure_arrivee and presence.heure_depart:
+            # Convertir heure_arrivee et heure_depart en datetime pour effectuer des soustractions
+            min_date = datetime.min  # Date fictive (date minimum)
+            
+            # Création de datetime à partir de l'heure pour les calculs
+            heure_arrivee = datetime.combine(min_date, presence.heure_arrivee)
+            heure_depart = datetime.combine(min_date, presence.heure_depart)
+
+            # Calcul des heures d'absence et heures supplémentaires
+            heures_absence = timedelta(0)
+            heures_sup = timedelta(0)
+
+            # Comparer l'heure d'arrivée et l'heure standard de départ
+            if heure_arrivee > (datetime.combine(min_date, datetime.min.time()) + heure_arrivee_standard):  # Arrivée en retard
+                heures_absence = heure_arrivee - (datetime.combine(min_date, datetime.min.time()) + heure_arrivee_standard)
+
+            if heure_depart < (datetime.combine(min_date, datetime.min.time()) + heure_depart_standard):  # Départ avant l'heure normale
+                heures_absence += (datetime.combine(min_date, datetime.min.time()) + heure_depart_standard) - heure_depart
+
+            if heure_depart > (datetime.combine(min_date, datetime.min.time()) + heure_depart_standard):  # Heures supplémentaires si départ après 17h30
+                heures_sup = heure_depart - (datetime.combine(min_date, datetime.min.time()) + heure_depart_standard)
+
+            # Mise à jour des totaux
+            employes[employe]['jours'].append({
+                'date': presence.date.strftime('%Y-%m-%d'),
+                'presences': 1 if presence.status == 'P' else 0,
+                'absences': 1 if presence.status == 'A' else 0,
+                'heures_absence': round(heures_absence.total_seconds() / 3600, 2),  # Convertir en heures
+                'heures_sup': round(heures_sup.total_seconds() / 3600, 2)  # Convertir en heures supplémentaires
+            })
+
+            employes[employe]['totalP'] += 1 if presence.status == 'P' else 0
+            employes[employe]['totalA'] += 1 if presence.status == 'A' else 0
+            employes[employe]['total_heures'] += (heure_depart - heure_arrivee).total_seconds() / 3600  # Heures travaillées
+            employes[employe]['total_heures_absence'] += heures_absence.total_seconds() / 3600
+            employes[employe]['total_heures_sup'] += heures_sup.total_seconds() / 3600
+        else:
+            # Si heure_arrivee ou heure_depart sont None, on considère comme absence totale ou exempté
+            employes[employe]['jours'].append({
+                'date': presence.date.strftime('%Y-%m-%d'),
+                'presences': 0,
+                'absences': 1,
+                'heures_absence': 8.0,  # On peut supposer une absence complète de 8 heures
+                'heures_sup': 0
+            })
+            employes[employe]['totalA'] += 1
+            employes[employe]['total_heures_absence'] += 8.0  # Absence totale
 
     context = {
         'date_debut': date_debut.strftime('%Y-%m-%d'),
@@ -369,6 +388,7 @@ def rapport(request):
         'employes': employes,
     }
     return render(request, 'rapport/rapport.html', context)
+
 
 
 from django.contrib.auth import authenticate
